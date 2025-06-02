@@ -116,7 +116,6 @@ impl Erosion {
     }
 
     fn deposit_heightmap(heightmap: &mut Heightmap, pos: &Vec2, amount: f32) {
-        // println!("{}", amount);
         if pos.x < 0.0 || pos.y < 0.0 {
             return;
         }

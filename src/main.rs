@@ -3,9 +3,12 @@ use bevy::{
     pbr::{Atmosphere, DirectionalLightShadowMap, light_consts::lux},
     picking::backend::ray::RayMap,
     prelude::*,
-    render::{camera::Exposure, mesh::VertexAttributeValues},
+    render::camera::Exposure,
 };
-use bevy_erosion::{erosion::Erosion, terrain::heightmap::Heightmap};
+use bevy_erosion::{
+    erosion::Erosion,
+    terrain::{create_mesh, create_terrain_image, heightmap::Heightmap},
+};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
 fn main() -> AppExit {
@@ -32,27 +35,29 @@ fn main() -> AppExit {
         })
         .insert_resource(ErosionSim {
             heightmap: Heightmap::new(512, 2.0, (-0.5, 0.0)),
-            max_iterations: 70_000,
-            // max_iterations: 0,
-            iterations: 1,
+            max_iterations: 100_000,
+            instant: true,
+            iterations: 0,
         })
         .add_systems(Startup, setup_scene)
-        // .add_systems(Update, run_sim)
+        .add_systems(Update, run_sim)
         // .add_systems(Update, check_gradient)
         .run()
 }
 
 #[derive(Resource)]
 struct ErosionSim {
-    pub max_iterations: usize,
-    pub iterations: usize,
     pub heightmap: Heightmap,
+    pub max_iterations: usize,
+    pub instant: bool,
+    pub iterations: usize,
 }
 
 fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
     mut erosion_sim: ResMut<ErosionSim>,
 ) {
     commands.spawn((
@@ -81,27 +86,20 @@ fn setup_scene(
         Transform::from_xyz(-1.0, 1.0, -1.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 
-    let terrain_material = StandardMaterial {
-        base_color: Color::srgb(0.6, 0.6, 0.6),
-        perceptual_roughness: 0.75,
-
-        ..default()
-    };
-
     erosion_sim.heightmap.generate(8, 2.0, 0.5, 2.5);
-    let iterations = erosion_sim.max_iterations;
-    let default_erosion = Erosion::default();
-    let erosion_1 = Erosion {
-        erosion: 0.7,
-        capacity: 8.0,
-        radius: 5,
-        initial_water: 2.0,
-        max_steps_for_particle: 256,
+
+    if erosion_sim.instant {
+        let iterations = erosion_sim.max_iterations;
+        Erosion::default().erode(&mut erosion_sim.heightmap, iterations);
+    }
+
+    let texture_handle = images.add(create_terrain_image(&erosion_sim.heightmap, 2048));
+    let terrain_material = StandardMaterial {
+        base_color: Color::WHITE,
+        base_color_texture: Some(texture_handle),
+        reflectance: 0.3,
         ..default()
     };
-
-    default_erosion.erode(&mut erosion_sim.heightmap, iterations);
-
     commands.spawn((
         Name::new("Terrain"),
         Mesh3d(meshes.add(create_mesh(&erosion_sim.heightmap, 1024))),
@@ -110,38 +108,19 @@ fn setup_scene(
     ));
 }
 
-fn create_mesh(heightmap: &Heightmap, resolution: u32) -> Mesh {
-    let size = 10.0;
-    let inv_size = 1.0 / size;
-
-    let mut plane = Mesh::from(
-        Plane3d::default()
-            .mesh()
-            .size(size, size)
-            .subdivisions(resolution),
-    );
-
-    let pos_attribute = plane.attribute_mut(Mesh::ATTRIBUTE_POSITION).unwrap();
-    let VertexAttributeValues::Float32x3(pos_attribute) = pos_attribute else {
-        panic!("Unexpected vertex format, expected Float32x3");
-    };
-
-    pos_attribute.iter_mut().for_each(|pos| {
-        pos[1] = heightmap.sample_bilinear((pos[0] * inv_size + 0.5, pos[2] * inv_size + 0.5));
-    });
-
-    plane.compute_normals();
-
-    plane
-}
-
 fn run_sim(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut images: ResMut<Assets<Image>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     terrain: Single<Entity, With<Mesh3d>>,
     mut erosion_sim: ResMut<ErosionSim>,
     key_input: Res<ButtonInput<KeyCode>>,
 ) {
+    if erosion_sim.instant {
+        return;
+    }
+
     if key_input.just_pressed(KeyCode::Space) {
         erosion_sim.max_iterations += 10_000;
     }
@@ -156,9 +135,18 @@ fn run_sim(
     Erosion::default().erode(&mut erosion_sim.heightmap, new_iters);
 
     let mesh = create_mesh(&erosion_sim.heightmap, 1024);
-    commands
-        .entity(terrain.entity())
-        .insert(Mesh3d(meshes.add(mesh)));
+    let texture_handle = images.add(create_terrain_image(&erosion_sim.heightmap, 2048));
+    let terrain_material = StandardMaterial {
+        base_color: Color::WHITE,
+        base_color_texture: Some(texture_handle),
+        reflectance: 0.3,
+        ..default()
+    };
+
+    commands.entity(terrain.entity()).insert((
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(materials.add(terrain_material)),
+    ));
 }
 
 fn check_gradient(

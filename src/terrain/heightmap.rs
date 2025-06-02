@@ -168,7 +168,7 @@ impl Heightmap {
 
         for x in 0..self.resolution {
             for y in 0..self.resolution {
-                let index = self.get_index(x, y);
+                let index = self.get_index(y, x);
 
                 let noise_base_x = x as f32 * scaled_inv_resolution + self.offset.0;
                 let noise_base_y = y as f32 * scaled_inv_resolution + self.offset.1;
