@@ -4,7 +4,7 @@ use bevy::math::Vec2;
 use nanorand::Rng;
 
 pub mod erosion;
-pub mod heightmap;
+pub mod terrain;
 
 pub(crate) fn random_unit_vec2() -> bevy::math::Vec2 {
     let mut rng = nanorand::tls_rng();

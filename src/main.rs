@@ -1,5 +1,3 @@
-use std::env;
-
 use bevy::{
     core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
     pbr::{Atmosphere, DirectionalLightShadowMap, light_consts::lux},
@@ -7,13 +5,13 @@ use bevy::{
     prelude::*,
     render::{camera::Exposure, mesh::VertexAttributeValues},
 };
-use bevy_erosion::{erosion::Erosion, heightmap::Heightmap};
+use bevy_erosion::{erosion::Erosion, terrain::heightmap::Heightmap};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 
 fn main() -> AppExit {
-    unsafe {
-        env::set_var("RUST_BACKTRACE", "1");
-    }
+    // unsafe {
+    //     std::env::set_var("RUST_BACKTRACE", "1");
+    // }
 
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -33,13 +31,13 @@ fn main() -> AppExit {
             ..default()
         })
         .insert_resource(ErosionSim {
-            heightmap: Heightmap::new(512, 2.0, (0.5, 0.5)),
-            max_iterations: 100_000,
+            heightmap: Heightmap::new(512, 2.0, (-0.5, 0.0)),
+            max_iterations: 70_000,
             // max_iterations: 0,
             iterations: 1,
         })
         .add_systems(Startup, setup_scene)
-        .add_systems(Update, run_sim)
+        // .add_systems(Update, run_sim)
         // .add_systems(Update, check_gradient)
         .run()
 }
@@ -91,49 +89,18 @@ fn setup_scene(
     };
 
     erosion_sim.heightmap.generate(8, 2.0, 0.5, 2.5);
-    // Erosion {
-    //     initial_water: 2.0,
-    //     max_steps_for_particle: 128,
-    //     ..default()
-    // }
-    // .erode(&mut erosion_sim.heightmap, 100_000);
+    let iterations = erosion_sim.max_iterations;
+    let default_erosion = Erosion::default();
+    let erosion_1 = Erosion {
+        erosion: 0.7,
+        capacity: 8.0,
+        radius: 5,
+        initial_water: 2.0,
+        max_steps_for_particle: 256,
+        ..default()
+    };
 
-    // let mut rng = nanorand::WyRand::new();
-    // for i in 0..100 {
-    //     let positions = Erosion::default().erode_particle(&mut rng, &mut erosion_sim.heightmap);
-
-    //     if i % 8 != 0 {
-    //         continue;
-    //     }
-
-    //     commands.spawn((
-    //         Mesh3d(meshes.add(Sphere::new(0.01))),
-    //         MeshMaterial3d(materials.add(Color::srgb(0.6, 0.8, 0.6))),
-    //         Transform::from_xyz(
-    //             positions[0].x * 10.0 - 5.0,
-    //             positions[0].y + 100.0,
-    //             positions[0].z * 10.0 - 5.0,
-    //         ),
-    //     ));
-
-    //     let mut i = 0;
-    //     for position in &positions[1..] {
-    //         i += 1;
-    //         if i % 3 != 0 {
-    //             continue;
-    //         }
-
-    //         commands.spawn((
-    //             Mesh3d(meshes.add(Sphere::new(0.008))),
-    //             MeshMaterial3d(materials.add(Color::srgb(0.6, 0.6, 0.8))),
-    //             Transform::from_xyz(
-    //                 position.x * 10.0 - 5.0,
-    //                 position.y + 100.0,
-    //                 position.z * 10.0 - 5.0,
-    //             ),
-    //         ));
-    //     }
-    // }
+    default_erosion.erode(&mut erosion_sim.heightmap, iterations);
 
     commands.spawn((
         Name::new("Terrain"),
@@ -160,9 +127,7 @@ fn create_mesh(heightmap: &Heightmap, resolution: u32) -> Mesh {
     };
 
     pos_attribute.iter_mut().for_each(|pos| {
-        pos[1] = heightmap
-            .sample_bilinear((pos[0] * inv_size + 0.5, pos[2] * inv_size + 0.5))
-            .clamp(-0.5, 1.5);
+        pos[1] = heightmap.sample_bilinear((pos[0] * inv_size + 0.5, pos[2] * inv_size + 0.5));
     });
 
     plane.compute_normals();

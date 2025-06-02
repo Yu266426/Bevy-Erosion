@@ -1,8 +1,8 @@
-use bevy::math::{FloatPow, Vec2, Vec3};
+use bevy::math::{FloatPow, Vec2};
 use nanorand::{Rng, WyRand};
 use particle::Particle;
 
-use crate::heightmap::Heightmap;
+use crate::terrain::heightmap::Heightmap;
 
 mod particle;
 
@@ -47,7 +47,7 @@ impl Erosion {
         }
     }
 
-    pub fn erode_particle(&self, rng: &mut WyRand, heightmap: &mut Heightmap) -> Vec<Vec3> {
+    pub fn erode_particle(&self, rng: &mut WyRand, heightmap: &mut Heightmap) {
         let resolution = (heightmap.resolution() - 1) as f32;
         let inv_resolution = 1.0 / resolution;
 
@@ -61,24 +61,12 @@ impl Erosion {
             self.initial_water,
         );
 
-        let mut positions: Vec<Vec3> = Vec::with_capacity(self.max_steps_for_particle + 1);
-        positions.push(Vec3::new(
-            p.pos.x * inv_resolution,
-            heightmap.sample_bilinear((starting_x, starting_y)),
-            p.pos.y * inv_resolution,
-        ));
-
-        // println!("New particle | pos: {}", p.pos);
         for _ in 0..self.max_steps_for_particle {
             let prev_pos = p.pos;
             let prev_norm_coords = (p.pos.x * inv_resolution, p.pos.y * inv_resolution);
 
             let prev_height = heightmap.sample_bilinear(prev_norm_coords);
             let gradient = heightmap.get_gradient(prev_norm_coords);
-
-            // TODO: or new random direction
-            // p.dir = (p.dir * self.inertia - gradient * (1.0 - self.inertia))
-            //     .normalize_or(random_unit_vec2());
 
             p.dir = (p.dir * self.inertia - gradient * (1.0 - self.inertia)).normalize_or_zero();
 
@@ -111,7 +99,6 @@ impl Erosion {
                 };
                 p.sediment -= amount_to_deposit;
                 Self::deposit_heightmap(heightmap, &prev_pos, amount_to_deposit);
-                // Self::erode_heightmap(heightmap, &prev_pos, -amount_to_deposit, self.radius);
             }
             // Otherwise, take up some sediment
             else {
@@ -121,28 +108,11 @@ impl Erosion {
                 Self::erode_heightmap(heightmap, &prev_pos, amount_to_erode, self.radius);
             }
 
-            // println!(
-            //     "h_diff: {}, Speed: {}, Sed: {}, c: {}",
-            //     height_diff, p.speed, p.sediment, carry_capacity
-            // );
-
-            if height_diff.abs() > 0.5 {
-                println!("{} {} | {:?}", height_diff, carry_capacity, p);
-            }
-
             p.speed = (p.speed.squared() + height_diff * self.gravity)
                 .max(0.000001)
                 .sqrt();
             p.water *= 1.0 - self.evaporation;
-
-            // positions.push(Vec3::new(
-            //     p.pos.x * inv_resolution,
-            //     height,
-            //     p.pos.y * inv_resolution,
-            // ));
         }
-
-        return positions;
     }
 
     fn deposit_heightmap(heightmap: &mut Heightmap, pos: &Vec2, amount: f32) {
