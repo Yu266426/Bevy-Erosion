@@ -11,7 +11,6 @@ pub struct Particle {
 
 impl Particle {
     pub fn new(pos: Vec2, dir: Vec2, initial_speed: f32, initial_water: f32) -> Self {
-        // TODO: Make direction random if error
         Self {
             pos,
             dir: dir.normalize_or_zero(),

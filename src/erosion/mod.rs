@@ -4,7 +4,10 @@ use particle::Particle;
 
 use crate::terrain::heightmap::Heightmap;
 
+mod constants;
 mod particle;
+
+pub use constants::ErosionConstants;
 
 pub struct Erosion {
     pub erosion: f32,
@@ -72,8 +75,8 @@ impl Erosion {
 
             p.pos += (p.dir * p.speed).clamp_length_max(1.0);
 
-            if p.dir.length_squared() <= 1e-6
-                || p.speed < 1e-4
+            if p.dir.length_squared() <= ErosionConstants::MIN_DIR_LENGTH_SQUARED
+                || p.speed < ErosionConstants::MIN_SPEED
                 || p.pos.x <= 0.0
                 || p.pos.x >= resolution
                 || p.pos.y <= 0.0
