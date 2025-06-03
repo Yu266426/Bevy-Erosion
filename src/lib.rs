@@ -3,6 +3,7 @@ use std::f32::consts::TAU;
 use bevy::math::Vec2;
 use nanorand::Rng;
 
+pub mod common;
 pub mod erosion;
 pub mod terrain;
 

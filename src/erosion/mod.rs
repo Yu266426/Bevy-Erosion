@@ -11,6 +11,7 @@ mod particle;
 pub use constants::ErosionConstants;
 pub use data::{ErosionData, ErosionDataType};
 
+#[derive(Debug, Clone)]
 pub struct Erosion {
     pub erosion: f32,
     pub inertia: f32,
@@ -59,8 +60,23 @@ impl Erosion {
             None
         };
 
+        let mut tuned_self = self.clone();
+
+        let heightmap_scale_factor = heightmap.resolution() as f32 / 512.0;
+
+        tuned_self.initial_water *= heightmap_scale_factor;
+        tuned_self.capacity *= heightmap_scale_factor;
+        tuned_self.radius = ((self.radius as f32) * heightmap_scale_factor).round() as i32;
+        tuned_self.max_steps_for_particle =
+            ((self.max_steps_for_particle as f32) * heightmap_scale_factor).round() as usize;
+
+        if heightmap_scale_factor.abs() > 1e-6 {
+            tuned_self.min_slope /= heightmap_scale_factor;
+            tuned_self.flat_threshold /= heightmap_scale_factor;
+        }
+
         for _ in 0..num_particles {
-            self.erode_particle(&mut rng, heightmap, erosion_data.as_mut());
+            tuned_self.erode_particle(&mut rng, heightmap, erosion_data.as_mut());
         }
 
         erosion_data
@@ -131,6 +147,7 @@ impl Erosion {
                 } else {
                     (p.sediment - carry_capacity) * self.deposition
                 };
+
                 p.sediment -= amount_to_deposit;
                 Self::deposit_heightmap(heightmap, &prev_pos, amount_to_deposit);
 
@@ -143,6 +160,7 @@ impl Erosion {
             else {
                 let amount_to_erode =
                     ((carry_capacity - p.sediment) * self.erosion).min(-height_diff);
+
                 p.sediment += amount_to_erode;
                 Self::erode_heightmap(heightmap, &prev_pos, amount_to_erode, self.radius);
 

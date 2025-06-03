@@ -29,11 +29,12 @@ fn main() -> AppExit {
         .insert_resource(ClearColor(Color::srgb(0.2, 0.2, 0.2)))
         .insert_resource(DirectionalLightShadowMap { size: 4096 })
         .insert_resource(AmbientLight {
-            brightness: 15000.0,
+            // brightness: 15000.0,
+            brightness: 50000.0,
             ..default()
         })
         .insert_resource(ErosionSim {
-            terrain: Terrain::new(512, 2.0, (-0.5, 0.0)),
+            terrain: Terrain::new(512, 2.0, 5.0, (-0.5, 0.0)),
             max_iterations: 100_000,
             instant: true,
             iterations: 0,
@@ -122,28 +123,43 @@ fn setup_terrain(
     images: &mut Assets<Image>,
     erosion_sim: &mut ErosionSim,
 ) {
+    let mut comparison_terrain = Terrain::new(1024, 2.0, 5.0, (-0.5, 0.0));
+
     // Generate the heightmap using fractal noise
     erosion_sim.terrain.generate(8, 2.0, 0.5, 2.5);
+    comparison_terrain.generate(8, 2.0, 0.5, 2.5);
 
     // Apply erosion if instant mode is enabled
     if erosion_sim.instant {
         let iterations = erosion_sim.max_iterations;
         erosion_sim.terrain.erode(&Erosion::default(), iterations);
     }
+    comparison_terrain.erode(&Erosion::default(), erosion_sim.max_iterations);
 
     // Create terrain texture and material
-    let texture_handle = images.add(erosion_sim.terrain.create_terrain_image(2048));
-    // let texture_handle = images.add(erosion_sim.terrain.create_erosion_map(2048).unwrap());
+    // let texture_handle = images.add(erosion_sim.terrain.create_terrain_image(2048));
+    // let comparison_texture_handle = images.add(comparison_terrain.create_terrain_image(2048));
+    let texture_handle = images.add(erosion_sim.terrain.create_erosion_map(2048).unwrap());
+    let comparison_texture_handle =
+        images.add(comparison_terrain.create_erosion_map(2048).unwrap());
     // let texture_handle = images.add(
     // erosion_sim
     // .terrain
     // .create_erosion_data_image(bevy_erosion::erosion::ErosionDataType::Wetness, 2048)
     // .unwrap(),
     // );
+
     let terrain_material = StandardMaterial {
         base_color: Color::WHITE,
         // base_color: Color::srgb(0.6, 0.6, 0.6),
         base_color_texture: Some(texture_handle),
+        reflectance: 0.3,
+        ..default()
+    };
+    let comparison_terrain_material = StandardMaterial {
+        base_color: Color::WHITE,
+        // base_color: Color::srgb(0.6, 0.6, 0.6),
+        base_color_texture: Some(comparison_texture_handle),
         reflectance: 0.3,
         ..default()
     };
@@ -154,6 +170,13 @@ fn setup_terrain(
         Mesh3d(meshes.add(erosion_sim.terrain.create_mesh(1024, TERRAIN_SIZE))),
         MeshMaterial3d(materials.add(terrain_material.clone())),
         Transform::from_xyz(0.0, 100.0, 0.0),
+    ));
+    commands.spawn((
+        Name::new("Terrain"),
+        Mesh3d(meshes.add(comparison_terrain.create_mesh(2048, TERRAIN_SIZE))),
+        MeshMaterial3d(materials.add(comparison_terrain_material.clone())),
+        Transform::from_xyz(11.0, 100.0, 0.0),
+        // Transform::from_xyz(0.0, 101.0, 0.0),
     ));
 }
 
@@ -284,6 +307,7 @@ fn check_gradient(
             .terrain
             .heightmap
             .sample_bilinear(new_norm_coords)
+            * erosion_sim.terrain.height_scale
             + HEIGHT_OFFSET;
 
         // Calculate direction vector for visualization

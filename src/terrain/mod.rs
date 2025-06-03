@@ -16,6 +16,7 @@ pub mod terrain_types;
 
 /// Represents a 3D terrain with a 2D heightmap and erosion data
 pub struct Terrain {
+    pub height_scale: f32,
     /// The heightmap defines the terrain's elevation
     pub heightmap: Heightmap,
     /// Optional erosion data collected during erosion simulation
@@ -23,8 +24,9 @@ pub struct Terrain {
 }
 
 impl Terrain {
-    pub fn new(resolution: usize, scale: f32, offset: (f32, f32)) -> Self {
+    pub fn new(resolution: usize, scale: f32, height_scale: f32, offset: (f32, f32)) -> Self {
         Self {
+            height_scale,
             heightmap: Heightmap::new(resolution, scale, offset),
             erosion_data: None,
         }
@@ -69,7 +71,8 @@ impl Terrain {
         pos_attribute.iter_mut().for_each(|pos| {
             pos[1] = self
                 .heightmap
-                .sample_bilinear((pos[0] * inv_size + 0.5, pos[2] * inv_size + 0.5));
+                .sample_bilinear((pos[0] * inv_size + 0.5, pos[2] * inv_size + 0.5))
+                * self.height_scale;
         });
 
         // Calculate vertex normals based on modified positions
