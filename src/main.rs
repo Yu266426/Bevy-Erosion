@@ -133,8 +133,16 @@ fn setup_terrain(
 
     // Create terrain texture and material
     let texture_handle = images.add(erosion_sim.terrain.create_terrain_image(2048));
+    // let texture_handle = images.add(erosion_sim.terrain.create_erosion_map(2048).unwrap());
+    // let texture_handle = images.add(
+    // erosion_sim
+    // .terrain
+    // .create_erosion_data_image(bevy_erosion::erosion::ErosionDataType::Wetness, 2048)
+    // .unwrap(),
+    // );
     let terrain_material = StandardMaterial {
         base_color: Color::WHITE,
+        // base_color: Color::srgb(0.6, 0.6, 0.6),
         base_color_texture: Some(texture_handle),
         reflectance: 0.3,
         ..default()

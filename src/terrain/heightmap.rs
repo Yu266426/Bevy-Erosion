@@ -1,26 +1,15 @@
 use bevy::math::Vec2;
 use noisy_bevy::simplex_noise_2d;
 
-/// Represents a 2D heightmap with various sampling methods
+#[derive(Debug, Clone)]
 pub struct Heightmap {
     resolution: usize,
     scale: f32,
     offset: (f32, f32),
     field: Vec<f32>,
-    /// Cached min and max height values for optimization
-    height_range: Option<(f32, f32)>,
 }
 
 impl Heightmap {
-    /// Creates a new heightmap with the specified resolution, scale, and offset
-    ///
-    /// # Arguments
-    /// * `resolution` - The size of the heightmap grid (resolution × resolution)
-    /// * `scale` - The scale factor for noise generation
-    /// * `offset` - The offset for noise generation coordinates (x, y)
-    ///
-    /// # Panics
-    /// Panics if resolution is 0
     pub fn new(resolution: usize, scale: f32, offset: (f32, f32)) -> Self {
         if resolution == 0 {
             panic!("HeightMap resolution cannot be 0.");
@@ -31,7 +20,6 @@ impl Heightmap {
             scale,
             offset,
             field: vec![0.0; resolution * resolution],
-            height_range: None,
         }
     }
 
@@ -43,25 +31,10 @@ impl Heightmap {
         self.scale
     }
 
-    pub fn height_range(&self) -> Option<(f32, f32)> {
-        self.height_range
-    }
-
     pub fn data(&self) -> &[f32] {
         &self.field
     }
 
-    /// Converts row and column indices to a linear index in the field array
-    ///
-    /// # Arguments
-    /// * `row` - The row index
-    /// * `col` - The column index
-    ///
-    /// # Returns
-    /// The linear index in the field array
-    ///
-    /// # Panics
-    /// Panics in debug mode if row or column is out of bounds
     #[inline]
     pub fn get_index(&self, row: usize, col: usize) -> usize {
         if cfg!(debug_assertions) {
@@ -92,19 +65,9 @@ impl Heightmap {
         (index % self.resolution, index / self.resolution) // (col, row)
     }
 
-    /// Changes the height value at the specified index by adding the given amount
-    ///
-    /// # Arguments
-    /// * `index` - The linear index in the field array
-    /// * `amount` - The amount to add to the height value
-    ///
-    /// # Safety
-    /// This method does not check if the index is valid
     #[inline]
     pub fn change_field(&mut self, index: usize, amount: f32) {
         self.field[index] += amount;
-        // Invalidate cached height range when modifying the heightmap
-        self.height_range = None;
     }
 
     pub fn sample(&self, norm_coords: (f32, f32)) -> f32 {
@@ -172,13 +135,6 @@ impl Heightmap {
         final_value
     }
 
-    /// Calculates the gradient (slope direction) at the specified normalized coordinates
-    ///
-    /// # Arguments
-    /// * `norm_coords` - The normalized coordinates (x, y) in range [0, 1]
-    ///
-    /// # Returns
-    /// A 2D vector representing the gradient at the specified position
     pub fn get_gradient(&self, norm_coords: (f32, f32)) -> Vec2 {
         if self.resolution <= 1 {
             // For a 0x0 map (which `new` should prevent) or a 1x1 map,
@@ -262,20 +218,9 @@ impl Heightmap {
                 self.field[index] = final_value;
             }
         }
-
-        // Reset height range since we've generated new data
-        self.height_range = None;
     }
 
-    /// Calculates and caches the minimum and maximum height values in the heightmap
-    ///
-    /// # Returns
-    /// A tuple containing (min_height, max_height)
-    pub fn calculate_height_range(&mut self) -> (f32, f32) {
-        if let Some(range) = self.height_range {
-            return range;
-        }
-
+    pub fn calculate_height_range(&self) -> (f32, f32) {
         let mut min_height = f32::MAX;
         let mut max_height = f32::MIN;
 
@@ -288,7 +233,6 @@ impl Heightmap {
             }
         }
 
-        self.height_range = Some((min_height, max_height));
         (min_height, max_height)
     }
 }
